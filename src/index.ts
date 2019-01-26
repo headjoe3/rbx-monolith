@@ -4,11 +4,11 @@ import * as chokidar from "chokidar";
 import * as fs from "fs";
 import * as path from "path";
 import * as yargs from "yargs";
-import * as util from "util";
 import { Compiler } from "./compiler/Compiler";
 import { CompilerError } from "./compiler/errors/CompilerError";
 import { TranspilerError } from "./compiler/errors/TranspilerError";
 import { clearContextCache } from "./compiler/utility";
+//import * as util from "util";
 
 //@ts-ignore
 const versionStr = require("../package.json").version as string;

@@ -319,7 +319,7 @@ export class Compiler {
 
 	public async compileAll(noInclude: boolean) {
 		// Debug
-		//new Transpiler(this).transpileSourceFile(new Combiner.SourceFile(this.project.getDirectory("/lua_src/test.lua")!.path))
+		// new Transpiler(this).transpileSourceFile(new Combiner.SourceFile(this.project.getDirectory("/lua_src/test.lua")!.path))
 
 		await this.compileFiles(this.project.getSourceFiles());
 	}

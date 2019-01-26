@@ -1,10 +1,10 @@
 import { SourceFile } from "./Combiner";
 import { Compiler } from "./Compiler";
+
 import * as ParsedLua from "./ParsedLua"
 import * as fs from "fs-extra"
-/*
 import * as util from "util"
-*/
+
 import {
 	red,
 	/*
@@ -17,10 +17,13 @@ export default class Transpiler {
     constructor(compiler: Compiler) {
 
     }
-	transpileSourceFile(sourceFile: SourceFile): any {
+	transpileSourceFile(sourceFile: SourceFile): string {
 		try {
-			const parsed = ParsedLua.parse(fs.readFileSync(sourceFile.getFilePath()).toString())
-			//console.log("Parsed file", sourceFile, util.inspect(parsed, {showHidden: false, depth: null}))
+			const SHOW_TEST_FILE = false
+			if (SHOW_TEST_FILE) {
+				const parsed = ParsedLua.parse(fs.readFileSync(sourceFile.getFilePath()).toString())
+				console.log("Parsed file", sourceFile, util.inspect(parsed, {showHidden: false, depth: null}))
+			}
 		} catch(e) {
 			if (e instanceof SyntaxError) {
 				let line: string | undefined

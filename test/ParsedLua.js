@@ -37,12 +37,43 @@ alo
 `,
 `
 x = true and #(a + b - -c * d ^ h / (i .. j())) and 3 or 2 > 3 <= 5 == "Hello" % 10 ~= 7
+`,
+`export {x}`,
+`export "default" {x}`,
+`export {x = x}`,
+`export {x = function() end}`,
+`export {x = class "MyClass" {
+
+}}`,
+`export "default" {class "MyClass" {
+
+}}`,
+`export "MyClass" { class {
+
+}}`,
+`test "" (2)`,
 `
+local x = math.huge --test
+local x = (0.00002)
+local x = 8999999999999999999999999999999999999999999999
+local x = 0.00
+local x = 000000000000000000000000000000000000000000000000000009`,
+``,
+`return {} --test`,
+`do
+if x then
+elseif y then
+else
+end
+end`
 ]
 const invalid_examples = [
 `123 $!@#$%^`,
 `()`,
-`$`
+`$`,
+`export default x`,
+`export default function x() end`,
+`export default class x do end`,
 ]
 
 function getNodesOfType(type, root) {
@@ -73,6 +104,38 @@ function getParseResult(source) {
     }
 }
 
+function assertNodeType(type, node) {
+    assert(ParsedLua.expect(type)(node), "Got unexpected node type " + ((node && node !== null) ? node.type : (typeof node)))
+}
+function assertNodeTypes(types, node) {
+    let oneNodeTypeFound = false
+    types.forEach(type => {
+        oneNodeTypeFound = oneNodeTypeFound || ParsedLua.expect(type)(node)
+    })
+    assert(oneNodeTypeFound, "Got unexpected node type " + ((node && node !== null) ? node.type : (typeof node)))
+}
+function assertUnionLiterals(literals, value) {
+    let inExpectedLiterals = false
+    literals.forEach(literal => {
+        if (value === literal) {
+            inExpectedLiterals = true
+        }
+    })
+    assert(inExpectedLiterals, "Got unexpected value '" + value + "'")
+}
+function assertNodeHasOptionalField(nodeType, field)  {
+    let foundExampleWith = false
+    let foundExampleWithout = false
+    forEachValidExampleNode(nodeType, node => {
+        if (node[field]) {
+            foundExampleWith = true
+        } else {
+            foundExampleWithout = true
+        }
+    })
+    assert.isOk(foundExampleWith && foundExampleWithout, `Found examples with field: ${foundExampleWith}; Found examples without field: ${foundExampleWithout}`)
+}
+
 // Get results for parsing valid lua examples
 const validResults = []
 valid_examples.forEach(example => {
@@ -84,6 +147,17 @@ const invalidResults = []
 invalid_examples.forEach(example => {
     invalidResults.push(getParseResult(example))
 })
+
+/** Calls a callback for each valid node of a given type within the valid example results */
+function forEachValidExampleNode(nodeType, func) {
+    validResults.forEach(result => {
+        const parsedChunk = result
+        const Nodes = getNodesOfType(nodeType, parsedChunk)
+        Nodes.forEach(node => {
+            func(node)
+        })
+    })
+}
 
 describe('ParsedLua', function() {
     describe('parse', function() {
@@ -112,26 +186,641 @@ describe('ParsedLua', function() {
         })
     })
     describe('Node', function() {
+        const NODE_TYPE = 'Node'
+        it('should be found in at least one example', function() {
+            let wasFound = false
+            forEachValidExampleNode(NODE_TYPE, (node) => {
+                wasFound = true
+            })
+            assert.isOk(wasFound)
+        })
         it('should have a string type', function() {
-            validResults.forEach(result => {
-                const parsedChunk = result
-                const Nodes = getNodesOfType('Node', parsedChunk)
-                Nodes.forEach(node => {
-                    assert.isString(node.type)
-                })
+            forEachValidExampleNode(NODE_TYPE, (node) => {
+                assert.isString(node.type)
             })
         })
     })
     describe('Chunk', function() {
+        const NODE_TYPE = 'Chunk'
+        it('should be found in at least one example', function() {
+            let wasFound = false
+            forEachValidExampleNode(NODE_TYPE, (node) => {
+                wasFound = true
+            })
+            assert.isOk(wasFound)
+        })
         it('should have body nodes of type "Statement"', function() {
-            validResults.forEach(result => {
-                const parsedChunk = result
-                const Chunks = getNodesOfType('Chunk', parsedChunk)
-                Chunks.forEach(chunk => {
-                    chunk.body.forEach(bodyNode => {
-                        assert.isTrue(ParsedLua.expect("Statement")(bodyNode))
-                    })
+            forEachValidExampleNode(NODE_TYPE, (node) => {
+                node.body.forEach(bodyNode => {
+                    assertNodeType("Statement", bodyNode)
                 })
+            })
+        })
+        it('should have comments nodes of type "Comment"', function() {
+            forEachValidExampleNode(NODE_TYPE, (node) => {
+                node.comments.forEach(commentNode => {
+                    assertNodeType("Comment", commentNode)
+                })
+            })
+        })
+    })
+    describe('CallExpression', function() {
+        const NODE_TYPE = 'CallExpression'
+        it('should be found in at least one example', function() {
+            let wasFound = false
+            forEachValidExampleNode(NODE_TYPE, (node) => {
+                wasFound = true
+            })
+            assert.isOk(wasFound)
+        })
+        it('should have base node of type "Expression"', function() {
+            forEachValidExampleNode(NODE_TYPE, (node) => {
+                assertNodeType("Expression", node.base)
+            })
+        })
+    })
+    describe('FunctionDeclaration', function() {
+        const NODE_TYPE = 'FunctionDeclaration'
+        it('should be found in at least one example', function() {
+            let wasFound = false
+            forEachValidExampleNode(NODE_TYPE, (node) => {
+                wasFound = true
+            })
+            assert.isOk(wasFound)
+        })
+        it('should have identifier property of type "Identifier | MemberExpression | null"', function() {
+            forEachValidExampleNode(NODE_TYPE, (node) => {
+                assert.isTrue(
+                    ParsedLua.expect("Identifier")(node.identifier)
+                    || ParsedLua.expect("MemberExpression")(node.identifier)
+                    || node.identifier === null,
+                    "Got identifier type " + (node.identifier !== null && node.identifier.type)
+                )
+            })
+        })
+        it('should have isLocal property of type "boolean"', function() {
+            forEachValidExampleNode(NODE_TYPE, (node) => {
+                assert.isBoolean(node.isLocal)
+            })
+        })
+        it('should have parameters property of type "Identifier[]"', function() {
+            forEachValidExampleNode(NODE_TYPE, (node) => {
+                node.parameters.forEach(formalParameter => {
+                    assertNodeType("Identifier", formalParameter)
+                })
+            })
+        })
+        it('should have body property of type "Statement[]"', function() {
+            forEachValidExampleNode(NODE_TYPE, (node) => {
+                node.body.forEach(bodyNode => {
+                    assertNodeType("Statement", bodyNode)
+                })
+            })
+        })
+    })
+    describe('MemberExpression', function() {
+        const NODE_TYPE = 'MemberExpression'
+        it('should be found in at least one example', function() {
+            let wasFound = false
+            forEachValidExampleNode(NODE_TYPE, node => {
+                wasFound = true
+            })
+            assert.isOk(wasFound)
+        })
+        it('should have indexer property of type ":" | "."', function() {
+            const EXPECTED_LITERALS = [":", "."]
+            forEachValidExampleNode(NODE_TYPE, node => {
+                let inExpectedLiterals = false
+                EXPECTED_LITERALS.forEach(literal => {
+                    if (node.indexer === literal) {
+                        inExpectedLiterals = true
+                    }
+                })
+                assert.isOk(inExpectedLiterals)
+            })
+        })
+        it('should have identifier property of type "Identifier"', function() {
+            forEachValidExampleNode(NODE_TYPE, (node) => {
+                assertNodeType("Identifier", node.identifier)
+            })
+        })
+        it('should have base property of type "Expression"', function() {
+            forEachValidExampleNode(NODE_TYPE, (node) => {
+                assertNodeType("Expression", node.base)
+            })
+        })
+    })
+    describe('TableConstructorExpression', function() {
+        const NODE_TYPE = 'TableConstructorExpression'
+        it('should be found in at least one example', function() {
+            let wasFound = false
+            forEachValidExampleNode(NODE_TYPE, (node) => {
+                wasFound = true
+            })
+            assert.isOk(wasFound)
+        })
+        it('should have fields of type (TableKeyString | TableValue | TableKey)[]', function() {
+            forEachValidExampleNode(NODE_TYPE, node => {
+                node.fields.forEach(fieldNode => {
+                    assertNodeTypes(["TableKeyString", "TableValue", "TableKey"], fieldNode)
+                })
+            })
+        })
+    })
+    describe('TableKey', function() {
+        const NODE_TYPE = 'TableKey'
+        it('should be found in at least one example', function() {
+            let wasFound = false
+            forEachValidExampleNode(NODE_TYPE, (node) => {
+                wasFound = true
+            })
+            assert.isOk(wasFound)
+        })
+        it('should have key of type Expression', function() {
+            forEachValidExampleNode(NODE_TYPE, node => {
+                assertNodeType("Expression", node.key)
+            })
+        })
+        it('should have value of type Expression', function() {
+            forEachValidExampleNode(NODE_TYPE, node => {
+                assertNodeType("Expression", node.value)
+            })
+        })
+    })
+    describe('TableValue', function() {
+        const NODE_TYPE = 'TableValue'
+        it('should be found in at least one example', function() {
+            let wasFound = false
+            forEachValidExampleNode(NODE_TYPE, (node) => {
+                wasFound = true
+            })
+            assert.isOk(wasFound)
+        })
+        it('should have value of type Expression', function() {
+            forEachValidExampleNode(NODE_TYPE, node => {
+                assertNodeType("Expression", node.value)
+            })
+        })
+    })
+    describe('TableKeyString', function() {
+        const NODE_TYPE = 'TableKeyString'
+        it('should be found in at least one example', function() {
+            let wasFound = false
+            forEachValidExampleNode(NODE_TYPE, (node) => {
+                wasFound = true
+            })
+            assert.isOk(wasFound)
+        })
+        it('should have key of type Identifier', function() {
+            forEachValidExampleNode(NODE_TYPE, node => {
+                assertNodeType("Identifier", node.key)
+            })
+        })
+        it('should have value of type Expression', function() {
+            forEachValidExampleNode(NODE_TYPE, node => {
+                assertNodeType("Expression", node.value)
+            })
+        })
+    })
+    describe('IndexExpression', function() {
+        const NODE_TYPE = 'IndexExpression'
+        it('should be found in at least one example', function() {
+            let wasFound = false
+            forEachValidExampleNode(NODE_TYPE, (node) => {
+                wasFound = true
+            })
+            assert.isOk(wasFound)
+        })
+        it('should have index of type Expression', function() {
+            forEachValidExampleNode(NODE_TYPE, node => {
+                assertNodeType("Expression", node.index)
+            })
+        })
+        it('should have base of type Expression', function() {
+            forEachValidExampleNode(NODE_TYPE, node => {
+                assertNodeType("Expression", node.base)
+            })
+        })
+    })
+    describe('StringLiteral', function() {
+        const NODE_TYPE = 'StringLiteral'
+        it('should be found in at least one example', function() {
+            let wasFound = false
+            forEachValidExampleNode(NODE_TYPE, (node) => {
+                wasFound = true
+            })
+            assert.isOk(wasFound)
+        })
+        it('should have raw property of type string', function() {
+            forEachValidExampleNode(NODE_TYPE, node => {
+                assert.isString(node.raw)
+            })
+        })
+        it('should have value property of type string', function() {
+            forEachValidExampleNode(NODE_TYPE, node => {
+                assert.isString(node.value)
+            })
+        })
+    })
+    describe('NumericLiteral', function() {
+        const NODE_TYPE = 'NumericLiteral'
+        it('should be found in at least one example', function() {
+            let wasFound = false
+            forEachValidExampleNode(NODE_TYPE, (node) => {
+                wasFound = true
+            })
+            assert.isOk(wasFound)
+        })
+        it('should have raw property of type string', function() {
+            forEachValidExampleNode(NODE_TYPE, node => {
+                assert.isString(node.raw)
+            })
+        })
+        it('should have value property of type number', function() {
+            forEachValidExampleNode(NODE_TYPE, node => {
+                assert.isNumber(node.value)
+            })
+        })
+    })
+    describe('BooleanLiteral', function() {
+        const NODE_TYPE = 'BooleanLiteral'
+        it('should be found in at least one example', function() {
+            let wasFound = false
+            forEachValidExampleNode(NODE_TYPE, (node) => {
+                wasFound = true
+            })
+            assert.isOk(wasFound)
+        })
+        it('should have raw property of type string', function() {
+            forEachValidExampleNode(NODE_TYPE, node => {
+                assert.isString(node.raw)
+            })
+        })
+        it('should have value property of type boolean', function() {
+            forEachValidExampleNode(NODE_TYPE, node => {
+                assert.isBoolean(node.value)
+            })
+        })
+    })
+    describe('NilLiteral', function() {
+        const NODE_TYPE = 'NilLiteral'
+        it('should be found in at least one example', function() {
+            let wasFound = false
+            forEachValidExampleNode(NODE_TYPE, (node) => {
+                wasFound = true
+            })
+            assert.isOk(wasFound)
+        })
+        it('should have raw property of type string', function() {
+            forEachValidExampleNode(NODE_TYPE, node => {
+                assert.isString(node.raw)
+            })
+        })
+        it('should have value property of type null', function() {
+            forEachValidExampleNode(NODE_TYPE, node => {
+                assert.isNull(node.value)
+            })
+        })
+    })
+    describe('LogicalExpression', function() {
+        const NODE_TYPE = 'LogicalExpression'
+        it('should be found in at least one example', function() {
+            let wasFound = false
+            forEachValidExampleNode(NODE_TYPE, (node) => {
+                wasFound = true
+            })
+            assert.isOk(wasFound)
+        })
+        it("should have operator of type 'and' | 'or' | 'not'", function() {
+            forEachValidExampleNode(NODE_TYPE, node => {
+                assertUnionLiterals(['and', 'or', 'not'], node.operator)
+            })
+        })
+        it('should have left of type Expression', function() {
+            forEachValidExampleNode(NODE_TYPE, node => {
+                assertNodeType("Expression", node.left)
+            })
+        })
+        it('should have right of type Expression', function() {
+            forEachValidExampleNode(NODE_TYPE, node => {
+                assertNodeType("Expression", node.right)
+            })
+        })
+    })
+    describe('BinaryExpression', function() {
+        const NODE_TYPE = 'BinaryExpression'
+        it('should be found in at least one example', function() {
+            let wasFound = false
+            forEachValidExampleNode(NODE_TYPE, (node) => {
+                wasFound = true
+            })
+            assert.isOk(wasFound)
+        })
+        it(`should have operator of type '-' | '+' | '/' | "*" | "^" | "%" | ".." | "~=" | "==" | "<=" | ">=" | "<" | ">"`, function() {
+            forEachValidExampleNode(NODE_TYPE, node => {
+                assertUnionLiterals(['-', '+', '/', "*", "^", "%", "..", "~=", "==", "<=", ">=", "<", ">"], node.operator)
+            })
+        })
+        it('should have left of type Expression', function() {
+            forEachValidExampleNode(NODE_TYPE, node => {
+                assertNodeType("Expression", node.left)
+            })
+        })
+        it('should have right of type Expression', function() {
+            forEachValidExampleNode(NODE_TYPE, node => {
+                assertNodeType("Expression", node.right)
+            })
+        })
+    })
+    describe('UnaryExpression', function() {
+        const NODE_TYPE = 'UnaryExpression'
+        it('should be found in at least one example', function() {
+            let wasFound = false
+            forEachValidExampleNode(NODE_TYPE, (node) => {
+                wasFound = true
+            })
+            assert.isOk(wasFound)
+        })
+        it(`should have operator of type '-' | '#'`, function() {
+            forEachValidExampleNode(NODE_TYPE, node => {
+                assertUnionLiterals(['-', '#'], node.operator)
+            })
+        })
+        it('should have argument of type Expression', function() {
+            forEachValidExampleNode(NODE_TYPE, node => {
+                assertNodeType("Expression", node.argument)
+            })
+        })
+    })
+    describe('CallExpression', function() {
+        const NODE_TYPE = 'CallExpression'
+        it('should be found in at least one example', function() {
+            let wasFound = false
+            forEachValidExampleNode(NODE_TYPE, (node) => {
+                wasFound = true
+            })
+            assert.isOk(wasFound)
+        })
+        it(`should have arguments of Expression[]`, function() {
+            forEachValidExampleNode(NODE_TYPE, node => {
+                node.arguments.forEach(argumentNode => {
+                    assertNodeType('Expression', argumentNode)
+                })
+            })
+        })
+    })
+    describe('TableCallExpression', function() {
+        const NODE_TYPE = 'TableCallExpression'
+        it('should be found in at least one example', function() {
+            let wasFound = false
+            forEachValidExampleNode(NODE_TYPE, (node) => {
+                wasFound = true
+            })
+            assert.isOk(wasFound)
+        })
+        it(`should have arguments of TableConstructorExpression`, function() {
+            forEachValidExampleNode(NODE_TYPE, node => {
+                assertNodeType('TableConstructorExpression', node.arguments)
+            })
+        })
+    })
+    describe('StringCallExpression', function() {
+        const NODE_TYPE = 'StringCallExpression'
+        it('should be found in at least one example', function() {
+            let wasFound = false
+            forEachValidExampleNode(NODE_TYPE, (node) => {
+                wasFound = true
+            })
+            assert.isOk(wasFound)
+        })
+        it(`should have argument of StringLiteral`, function() {
+            forEachValidExampleNode(NODE_TYPE, node => {
+                assertNodeType('StringLiteral', node.argument)
+            })
+        })
+    })
+    describe('LocalStatement', function() {
+        const NODE_TYPE = 'LocalStatement'
+        it('should be found in at least one example', function() {
+            let wasFound = false
+            forEachValidExampleNode(NODE_TYPE, (node) => {
+                wasFound = true
+            })
+            assert.isOk(wasFound)
+        })
+        it(`should have variables of type Identifier[]`, function() {
+            forEachValidExampleNode(NODE_TYPE, node => {
+                node.variables.forEach(variableNode => {
+                    assertNodeType('Identifier', variableNode)
+                })
+            })
+        })
+        it(`should have init of type Expression[]`, function() {
+            forEachValidExampleNode(NODE_TYPE, node => {
+                node.init.forEach(expressionNode => {
+                    assertNodeType('Expression', expressionNode)
+                })
+            })
+        })
+    })
+    describe('CallStatement', function() {
+        const NODE_TYPE = 'CallStatement'
+        it('should be found in at least one example', function() {
+            let wasFound = false
+            forEachValidExampleNode(NODE_TYPE, (node) => {
+                wasFound = true
+            })
+            assert.isOk(wasFound)
+        })
+        it(`should have expression of type Call`, function() {
+            forEachValidExampleNode(NODE_TYPE, node => {
+                assertNodeType('Call', node.expression)
+            })
+        })
+    })
+    describe('AssignmentStatement', function() {
+        const NODE_TYPE = 'AssignmentStatement'
+        it('should be found in at least one example', function() {
+            let wasFound = false
+            forEachValidExampleNode(NODE_TYPE, (node) => {
+                wasFound = true
+            })
+            assert.isOk(wasFound)
+        })
+        it(`should have variables of type (Identifier | MemberExpression | IndexExpression)[]`, function() {
+            forEachValidExampleNode(NODE_TYPE, node => {
+                node.variables.forEach(variableNode => {
+                    assertNodeTypes(["Identifier", "MemberExpression", "IndexExpression"], variableNode)
+                })
+            })
+        })
+        it(`should have init of type Expression[]`, function() {
+            forEachValidExampleNode(NODE_TYPE, node => {
+                node.init.forEach(expressionNode => {
+                    assertNodeType('Expression', expressionNode)
+                })
+            })
+        })
+    })
+    describe('ReturnStatement', function() {
+        const NODE_TYPE = 'ReturnStatement'
+        it('should be found in at least one example', function() {
+            let wasFound = false
+            forEachValidExampleNode(NODE_TYPE, (node) => {
+                wasFound = true
+            })
+            assert.isOk(wasFound)
+        })
+        it(`should have arguments of type Expression[]`, function() {
+            forEachValidExampleNode(NODE_TYPE, node => {
+                node.arguments.forEach(expressionNode => {
+                    assertNodeType('Expression', expressionNode)
+                })
+            })
+        })
+    })
+    describe('FunctionDeclarationStatement', function() {
+        const NODE_TYPE = 'FunctionDeclarationStatement'
+        it('should be found in at least one example', function() {
+            let wasFound = false
+            forEachValidExampleNode(NODE_TYPE, (node) => {
+                wasFound = true
+            })
+            assert.isOk(wasFound)
+        })
+        it('should have identifier property of type "Identifier | MemberExpression"', function() {
+            forEachValidExampleNode(NODE_TYPE, (node) => {
+                assertNodeTypes(["Identifier", "MemberExpression"], node.identifier)
+            })
+        })
+    })
+    describe('FunctionDeclarationExpression', function() {
+        const NODE_TYPE = 'FunctionDeclarationExpression'
+        it('should be found in at least one example', function() {
+            let wasFound = false
+            forEachValidExampleNode(NODE_TYPE, (node) => {
+                wasFound = true
+            })
+            assert.isOk(wasFound)
+        })
+        it('should have identifier property of type "null"', function() {
+            forEachValidExampleNode(NODE_TYPE, (node) => {
+                assert.isNull(node.identifier)
+            })
+        })
+    })
+    describe('DoStatement', function() {
+        const NODE_TYPE = 'DoStatement'
+        it('should be found in at least one example', function() {
+            let wasFound = false
+            forEachValidExampleNode(NODE_TYPE, (node) => {
+                wasFound = true
+            })
+            assert.isOk(wasFound)
+        })
+        it('should have body property of type "Statement[]"', function() {
+            forEachValidExampleNode(NODE_TYPE, (node) => {
+                node.body.forEach(bodyNode => {
+                    assertNodeType("Statement", bodyNode)
+                })
+            })
+        })
+    })
+    describe('IfStatement', function() {
+        const NODE_TYPE = 'IfStatement'
+        it('should be found in at least one example', function() {
+            let wasFound = false
+            forEachValidExampleNode(NODE_TYPE, (node) => {
+                wasFound = true
+            })
+            assert.isOk(wasFound)
+        })
+        it('should have clauses property of type "Clause[]"', function() {
+            forEachValidExampleNode(NODE_TYPE, (node) => {
+                node.clauses.forEach(clauseNode => {
+                    assertNodeType("Clause", clauseNode)
+                })
+            })
+        })
+    })
+    describe('IfClause', function() {
+        const NODE_TYPE = 'IfClause'
+        it('should be found in at least one example', function() {
+            let wasFound = false
+            forEachValidExampleNode(NODE_TYPE, (node) => {
+                wasFound = true
+            })
+            assert.isOk(wasFound)
+        })
+        it('should have condition property of type "Expression"', function() {
+            forEachValidExampleNode(NODE_TYPE, (node) => {
+                assertNodeType("Expression", node.condition)
+            })
+        })
+        it('should have body property of type "Statement[]"', function() {
+            forEachValidExampleNode(NODE_TYPE, (node) => {
+                node.body.forEach(bodyNode => {
+                    assertNodeType("Statement", bodyNode)
+                })
+            })
+        })
+    })
+    describe('ElseifClause', function() {
+        const NODE_TYPE = 'ElseifClause'
+        it('should be found in at least one example', function() {
+            let wasFound = false
+            forEachValidExampleNode(NODE_TYPE, (node) => {
+                wasFound = true
+            })
+            assert.isOk(wasFound)
+        })
+        it('should have condition property of type "Expression"', function() {
+            forEachValidExampleNode(NODE_TYPE, (node) => {
+                assertNodeType("Expression", node.condition)
+            })
+        })
+        it('should have body property of type "Statement[]"', function() {
+            forEachValidExampleNode(NODE_TYPE, (node) => {
+                node.body.forEach(bodyNode => {
+                    assertNodeType("Statement", bodyNode)
+                })
+            })
+        })
+    })
+    describe('ElseClause', function() {
+        const NODE_TYPE = 'ElseClause'
+        it('should be found in at least one example', function() {
+            let wasFound = false
+            forEachValidExampleNode(NODE_TYPE, (node) => {
+                wasFound = true
+            })
+            assert.isOk(wasFound)
+        })
+        it('should have body property of type "Statement[]"', function() {
+            forEachValidExampleNode(NODE_TYPE, (node) => {
+                node.body.forEach(bodyNode => {
+                    assertNodeType("Statement", bodyNode)
+                })
+            })
+        })
+    })
+    describe('Comment', function() {
+        const NODE_TYPE = 'Comment'
+        it('should be found in at least one example', function() {
+            let wasFound = false
+            forEachValidExampleNode(NODE_TYPE, (node) => {
+                wasFound = true
+            })
+            assert.isOk(wasFound)
+        })
+        it('should have raw property of type string', function() {
+            forEachValidExampleNode(NODE_TYPE, node => {
+                assert.isString(node.raw)
+            })
+        })
+        it('should have value property of type string', function() {
+            forEachValidExampleNode(NODE_TYPE, node => {
+                assert.isString(node.value)
             })
         })
     })
