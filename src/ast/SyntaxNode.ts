@@ -1,3 +1,5 @@
+import SyntaxKind from "./SyntaxKind";
+
 export default class SyntaxNode {
 	syntax_kind: SyntaxKind
 	children: SyntaxNode[] | undefined

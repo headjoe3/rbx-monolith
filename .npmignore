@@ -2,3 +2,5 @@ node_modules
 src
 test
 reference
+lua_src
+lua_out

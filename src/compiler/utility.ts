@@ -1,6 +1,6 @@
 import * as path from "path";
 import { CompilerError, CompilerErrorType } from "./errors/CompilerError";
-import Combiner = require("src/compiler/Combiner");
+import Combiner = require("./Combiner");
 
 const luaIdentifierRegex = /^[A-Za-z_][A-Za-z0-9_]*$/;
 export function isValidLuaIdentifier(id: string) {

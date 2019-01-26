@@ -1,4 +1,6 @@
-import TokenInfo from "src/compiler/lexical/TokenInfo";
+import TokenInfo from "../lexical/TokenInfo";
+
+import TokenType from "../lexical/TokenType";
 
 export default class BaseParser {
     private tokens: TokenInfo[]

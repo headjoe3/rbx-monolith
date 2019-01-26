@@ -1,17 +1,10 @@
 {
 	"compilerOptions": {
-		"outDir": "out",
-		"rootDir": "src",
-		"baseUrl": "src",
-		"paths": {
-			"src/*": ["*"]
-		}
+		"outDir": "lua_out",
+		"rootDir": "lua_src",
+		"baseUrl": "lua_src"
 	},
 	"include": [
-		"src/**/*"
-	],
-	"exclude": [
-		"node_modules/**/*",
-		"out/**/*"
+		"lua_src"
 	]
 }

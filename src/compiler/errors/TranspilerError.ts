@@ -1,4 +1,4 @@
-import Combiner = require("src/compiler/Combiner");
+import Combiner = require("../Combiner");
 
 export enum TranspilerErrorType {
 	ReservedKeyword,

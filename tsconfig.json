@@ -9,13 +9,6 @@
 		"strictNullChecks": true,
 		"sourceMap": true,
 		"noUnusedLocals": true,
-
-		// optional
-		"baseUrl": "src",
-		"declaration": false,
-		"paths": {
-			"src/*": ["*"]
-		},
 	},
 	"include": [
 		"src/**/*"

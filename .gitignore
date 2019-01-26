@@ -1,3 +1,5 @@
 reference
 node_modules
 out
+lua_src
+lua_out

@@ -1,13 +1,15 @@
-import TokenInfo from "src/compiler/lexical/TokenInfo";
-import BaseParser from "compiler/syntax/BaseParser"
-import SyntaxNode from "src/ast/SyntaxNode";
-import DoStatement from "src/ast/stats/DoStatement";
-import BreakStatement from "src/ast/stats/BreakStatement";
-import ReturnStatement from "src/ast/stats/ReturnStatement";
-import NilLiteralExpression from "src/ast/exprs/NilLiteralExpression";
-import BooleanLiteralExpression from "src/ast/exprs/BooleanLiteralExpression";
-import NumberLiteralExpression from "src/ast/exprs/NumberLiteralExpression";
+import BaseParser from "./BaseParser";
+import TokenInfo from "../lexical/TokenInfo";
+import SyntaxNode from "../../ast/SyntaxNode";
+import TokenType from "../lexical/TokenType";
+import DoStatement from "../../ast/stats/DoStatement";
+import BreakStatement from "../../ast/stats/BreakStatement";
+import ReturnStatement from "../../ast/stats/ReturnStatement";
+import NilLiteralExpression from "../../ast/exprs/NilLiteralExpression";
+import BooleanLiteralExpression from "../../ast/exprs/BooleanLiteralExpression";
+import NumberLiteralExpression from "../../ast/exprs/NumberLiteralExpression";
 
+/** Parses a list of tokens into an AST with the parse() function */
 export default class Parser extends BaseParser {
 	constructor(tokens: TokenInfo[]) {
         super(tokens)

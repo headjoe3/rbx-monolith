@@ -1,4 +1,4 @@
-declare enum TokenType {
+enum TokenType {
 	none = 0,
 
 	whitespace_trivia = 1,
@@ -63,3 +63,4 @@ declare enum TokenType {
 	left_bracket = 424,
 	right_bracket = 425,
 }
+export default TokenType

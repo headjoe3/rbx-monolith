@@ -1,12 +1,14 @@
-import BaseLexer from "src/compiler/lexical/BaseLexer";
-import TokenInfo from "src/compiler/lexical/TokenInfo";
-import { is_digit, is_letter } from "src/utils/stringutils";
+import TokenType from "./TokenType";
+import BaseLexer from "./BaseLexer";
+import TokenInfo from "./TokenInfo";
+import { is_digit, is_letter } from "../../utils/stringutils";
 
 interface TypeValuePair {
 	type: TokenType
 	value: string
 }
 
+/** Breaks a source string into extended lua tokens */
 export default class Lexer extends BaseLexer {
 	private trivias: TypeValuePair[]
 	private operators: TypeValuePair[]

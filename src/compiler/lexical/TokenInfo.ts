@@ -1,3 +1,5 @@
+import TokenType from "./TokenType";
+
 export default class TokenInfo {
     token_type: TokenType
     value: string

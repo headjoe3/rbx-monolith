@@ -1,4 +1,4 @@
-declare enum SyntaxKind {
+enum SyntaxKind {
 	// terminal trees (< 500)
 	break_statement = 1,
 	nil_literal_expression = 2,
@@ -9,3 +9,4 @@ declare enum SyntaxKind {
 	do_statement = 500,
 	return_statement = 501,
 }
+export default SyntaxKind

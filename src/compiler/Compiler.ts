@@ -10,13 +10,13 @@ import {
 	ScriptType,
 	stripExts,
 	yellow,
-} from "compiler/utility";
+} from "./utility";
 import { CompilerError, CompilerErrorType } from "./errors/CompilerError";
 import { DiagnosticError } from "./errors/DiagnosticError";
-import * as Combiner from "src/compiler/Combiner";
-import { Project } from "src/compiler/Combiner";
-import Transpiler from "src/compiler/Transpiler";
-import { TranspilerError } from "src/compiler/errors/TranspilerError";
+import * as Combiner from "./Combiner";
+import { Project } from "./Combiner";
+import Transpiler from "./Transpiler";
+import { TranspilerError } from "./errors/TranspilerError";
 
 const SYNC_FILE_NAMES = ["rojo.json", "rofresh.json"];
 
@@ -119,11 +119,11 @@ export class Compiler {
 	public readonly ci: boolean;
 
 	constructor(configFilePath: string, args: { [argName: string]: any }) {
+
 		this.projectPath = path.resolve(configFilePath, "..");
 		this.project = new Project({
 			monolithConfigFilePath: configFilePath,
 		});
-		this.project.addExistingSourceFiles(path.join(this.projectPath, "**/*.d.ts"));
 		this.noStrict = args.noStrict;
 		this.noHeuristics = args.noHeuristics;
 		this.ci = args.ci;
@@ -154,7 +154,7 @@ export class Compiler {
 		}
 		this.outDirPath = outDirPath;
 
-		// filter out outDir .d.ts files
+		// filter out outDir files
 		const outDir = this.project.getDirectory(outDirPath);
 		if (outDir) {
 			this.project.getSourceFiles().forEach(sourceFile => {
@@ -317,18 +317,16 @@ export class Compiler {
 		return this.rootDirPath;
 	}
 
-	public async copyLuaSourceFiles() {
-		await copyLuaFiles(this.rootDirPath, this.outDirPath);
-	}
-
 	public async compileAll(noInclude: boolean) {
-		await this.copyLuaSourceFiles();
+		// Debug
+		//new Transpiler(this).transpileSourceFile(new Combiner.SourceFile(this.project.getDirectory("/lua_src/test.lua")!.path))
+
 		await this.compileFiles(this.project.getSourceFiles());
 	}
 
 	public async compileFileByPath(filePath: string) {
 		const ext = path.extname(filePath);
-		if (ext === ".ts" || ext === ".tsx") {
+		if (ext === ".lua" || ext === ".monolith") {
 			const sourceFile = this.project.getSourceFile(filePath);
 			if (!sourceFile) {
 				throw new CompilerError(
@@ -353,8 +351,6 @@ export class Compiler {
 			search(sourceFile);
 
 			return this.compileFiles(files);
-		} else if (ext === ".lua") {
-			await this.copyLuaSourceFiles();
 		}
 	}
 
