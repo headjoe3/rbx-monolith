@@ -1,0 +1,27 @@
+{
+	"compilerOptions": {
+		"module": "commonjs",
+		"outDir": "out",
+		"rootDir": "src",
+		"target": "es6",
+		"strict": true,
+		"noFallthroughCasesInSwitch": true,
+		"strictNullChecks": true,
+		"sourceMap": true,
+		"noUnusedLocals": true,
+
+		// optional
+		"baseUrl": "src",
+		"declaration": false,
+		"paths": {
+			"src/*": ["*"]
+		},
+	},
+	"include": [
+		"src/**/*"
+	],
+	"exclude": [
+		"node_modules/**/*",
+		"out/**/*"
+	]
+}

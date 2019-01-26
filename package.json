@@ -1,0 +1,37 @@
+{
+  "name": "rbx-monolith",
+  "version": "0.0.0",
+  "description": "Monolithic RbxLua compiling tool",
+  "main": "out/index.js",
+  "scripts": {
+    "test": "mocha || true"
+  },
+  "bin": {
+    "monolith": "out/index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/headjoe3/rbx-monolith.git"
+  },
+  "author": "Robert Tulley (Roblox: DataBrain)",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/headjoe3/rbx-monolith/issues"
+  },
+  "homepage": "https://github.com/headjoe3/rbx-monolith#readme",
+  "dependencies": {
+    "chokidar": "^2.0.4",
+    "fs": "0.0.1-security",
+    "fs-extra": "^7.0.1",
+    "path": "^0.12.7",
+    "yargs": "^12.0.5"
+  },
+  "devDependencies": {
+    "@types/chokidar": "^1.7.5",
+    "@types/fs-extra": "^5.0.4",
+    "@types/node": "^10.12.18",
+    "@types/yargs": "^12.0.8",
+    "chai": "^4.2.0",
+    "mocha": "^5.2.0"
+  }
+}
