@@ -65,7 +65,11 @@ if x then
 elseif y then
 else
 end
-end`
+end`,
+`for _,v in pairs(x) do end
+while true do end
+for i = 1, 2, 3 do end
+for _,v in next, {} do end`,
 ]
 const invalid_examples = [
 `123 $!@#$%^`,

@@ -19,7 +19,7 @@ export default class Transpiler {
     }
 	transpileSourceFile(sourceFile: SourceFile): string {
 		try {
-			const SHOW_TEST_FILE = false
+			const SHOW_TEST_FILE = true
 			if (SHOW_TEST_FILE) {
 				const parsed = ParsedLua.parse(fs.readFileSync(sourceFile.getFilePath()).toString())
 				console.log("Parsed file", sourceFile, util.inspect(parsed, {showHidden: false, depth: null}))

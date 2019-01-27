@@ -36,8 +36,8 @@ interface ExpressionBase extends NodeBase {
 }
 
 
-///** A temporary marker that generalizes nodes whose strict type has not yet been proven in unit testing */
-// type ShouldBe<T, CouldBe = NodeBase> = T extends NodeBase ? T | CouldBe : any
+/** A temporary marker that generalizes nodes whose strict type has not yet been proven in unit testing */
+type ShouldBe<T, CouldBe = NodeBase> = T extends NodeBase ? T | CouldBe : any
 
 type StatementBase = NodeBase
 /** A type checker for some node type */
@@ -53,8 +53,8 @@ namespace ParsedLua {
         | Call | NilLiteral
     export const ExpressionStringTypes = [
         "Identifier", "FunctionDeclarationExpression", "MemberExpression", "TableConstructorExpression", "TableKeyString", "TableKey",
-        "TableValue", "IndexExpression", "StringLiteral", "NumericLiteral", "BooleanLiteral", "Clause", "IfClause", "ElseifClause", "ElseClause", "LogicalExpression",
-        "BinaryExpression", "UnaryExpression", "Call", "CallExpression", "TableCallExpression", "StringCallExpression", "NilLiteral"
+        "TableValue", "IndexExpression", "StringLiteral", "NumericLiteral", "BooleanLiteral", "Clause", "LogicalExpression",
+        "BinaryExpression", "UnaryExpression", "Call", "NilLiteral"
     ]
 
 
@@ -208,8 +208,10 @@ namespace ParsedLua {
 
     /** Parsed Lua Statement types */
     export type Statement = LocalStatement | CallStatement | AssignmentStatement | ReturnStatement | FunctionDeclarationStatement | DoStatement | IfStatement
+        | ForGenericStatement | ForNumericStatement | WhileStatement | RepeatStatement
     export const StatementStringTypes = [
-        "LocalStatement", "CallStatement", "AssignmentStatement", "ReturnStatement", "FunctionDeclarationStatement", "DoStatement", "IfStatement"
+        "LocalStatement", "CallStatement", "AssignmentStatement", "ReturnStatement", "FunctionDeclarationStatement", "DoStatement", "IfStatement",
+        "ForGenericStatement", "ForNumericStatement", "WhileStatement", "RepeatStatement"
     ]
 
 
@@ -252,6 +254,33 @@ namespace ParsedLua {
     export interface IfStatement extends StatementBase {
         type: "IfStatement"
         clauses: Clause
+    }
+    export interface ForGenericStatement extends StatementBase {
+        type: "ForGenericStatement"
+        variables: ShouldBe<Identifier>[]
+        iterators: ShouldBe<CallExpression>[]
+        body: Statement[]
+    }
+    export interface ForNumericStatement extends StatementBase {
+        type: "ForNumericStatement"
+        variable: ShouldBe<Identifier>
+        /** An expression that evaluates to the number at which the for loop should start */
+        start: ShouldBe<Expression>
+        /** An expression that evaluates to the number at which the for loop should end */
+        end: ShouldBe<Expression>
+        /** An expression that evaluates to the number for which the loop should increment after each step*/
+        step: ShouldBe<Expression>
+        body: Statement[]
+    }
+    export interface WhileStatement extends StatementBase {
+        type: "WhileStatement"
+        condition: Expression
+        body: Statement[]
+    }
+    export interface RepeatStatement extends StatementBase {
+        type: "RepeatStatement"
+        condition: Expression
+        body: Statement[]
     }
 
 
@@ -298,6 +327,12 @@ namespace ParsedLua {
         raw: string
     }
 
+    /** Types of statements/expressions which contain a body of nested statements */
+    export type HasBody = Chunk | Clause | RepeatStatement | WhileStatement | ForGenericStatement | ForNumericStatement | DoStatement | FunctionDeclaration
+    export const HasBodyStringTypes = [
+        "Chunk", "Clause", "RepeatStatement", "WhileStatement", "ForGenericStatement", "ForNumericStatement", "DoStatement", "FunctionDeclaration"
+    ]
+
     export type Node = Chunk | Comment | Statement | Expression | Clause
     export type NodeInterfaceType = "Node" | "Statement" | "Expression" | "Clause" | Expression["type"] | Statement["type"] | Chunk["type"] | Comment["type"]
 
@@ -312,6 +347,7 @@ namespace ParsedLua {
     export function expect(nodeType: "Clause"): NodeCheck<Clause>
     export function expect(nodeType: "FunctionDeclaration"): NodeCheck<FunctionDeclaration>
     export function expect(nodeType: "Call"): NodeCheck<Call>
+    export function expect(nodeType: "HasBody"): NodeCheck<HasBody>
 
     // Other types
     export function expect(nodeType: "Chunk"): NodeCheck<Chunk>
@@ -344,6 +380,10 @@ namespace ParsedLua {
     export function expect(nodeType: "ReturnStatement"): NodeCheck<ReturnStatement>
     export function expect(nodeType: "DoStatement"): NodeCheck<DoStatement>
     export function expect(nodeType: "IfStatement"): NodeCheck<IfStatement>
+    export function expect(nodeType: "ForGenericStatement"): NodeCheck<ForGenericStatement>
+    export function expect(nodeType: "ForNumericStatement"): NodeCheck<ForNumericStatement>
+    export function expect(nodeType: "WhileStatement"): NodeCheck<WhileStatement>
+    export function expect(nodeType: "RepeatStatement"): NodeCheck<RepeatStatement>
 
     // Clause types
     export function expect(nodeType: "IfClause"): NodeCheck<IfClause>
@@ -365,7 +405,7 @@ namespace ParsedLua {
             if (!value || !(typeof value === "object") || value === null || !((value as NodeBase).type)) return;
             const node = value as NodeBase
 
-            // Abstract interfaces
+            // Union interfaces
             if (nodeType === "Node") return true;
             if (nodeType === "Expression") {
                 for (const i in ExpressionStringTypes) {
@@ -381,15 +421,6 @@ namespace ParsedLua {
                 }
                 return false;
             }
-            
-            // Distinguish function declaration statements from function declaration expressions
-            if (nodeType === "FunctionDeclarationStatement") {
-                return node.type === "FunctionDeclaration" && (node as FunctionDeclaration).identifier !== null;
-            }
-            if (nodeType === "FunctionDeclarationExpression") {
-                return node.type === "FunctionDeclaration" && (node as FunctionDeclaration).identifier === null;
-            }
-
             if (nodeType === "Clause") {
                 for (const i in ClauseStringTypes) {
                     const type = ClauseStringTypes[i]
@@ -403,6 +434,21 @@ namespace ParsedLua {
                     if (expect(type as "Call")(node)) return true;
                 }
                 return false;
+            }
+            if (nodeType === "HasBody") {
+                for (const i in HasBodyStringTypes) {
+                    const type = HasBodyStringTypes[i]
+                    if (expect(type as "HasBody")(node)) return true;
+                }
+                return false;
+            }
+            
+            // Distinguish function declaration statements from function declaration expressions
+            if (nodeType === "FunctionDeclarationStatement") {
+                return node.type === "FunctionDeclaration" && (node as FunctionDeclaration).identifier !== null;
+            }
+            if (nodeType === "FunctionDeclarationExpression") {
+                return node.type === "FunctionDeclaration" && (node as FunctionDeclaration).identifier === null;
             }
 
             // Default
