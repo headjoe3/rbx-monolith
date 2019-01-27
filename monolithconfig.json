@@ -11,6 +11,6 @@
 	"exclude": [
 		"lua_src"
 	],
-	"obfuscate": true,
-	"uglify": true
+	"obfuscate": false,
+	"uglify": false
 }

@@ -129,23 +129,51 @@ namespace Combiner {
         /** A cached ast representation of code for this module */
         private parsedChunkCache?: ParsedLua.Chunk
         /** Unique prefix for all exported identifiers */
-        private moduleMonolithicName?: string
+        private moduleMonolithicName: string
         /** Map from exported identifiers to their unique monolithic names */
         private exportedIdentifiersCache: Map<string, string>
         private obfuscated: boolean
+        private project: Project
 
         constructor(project: Project, path: string) {
             this.path = path
+            this.project = project
 
             this.obfuscated = project.getCompilerOptions().obfuscate
             if (this.obfuscated) {
-                this.moduleMonolithicName = "_" + getUniqueID(10)
-            } else {
-                let modulePath = relative(resolve(project.getCompilerOptions().rootDir), path)
-                if (modulePath.endsWith(".lua")) {
-                    modulePath = modulePath.substr(0, modulePath.length - ".lua".length)
+                let id: string
+                do {
+                    id = "_" + getUniqueID(10)
                 }
-                this.moduleMonolithicName = toSnakeCase(modulePath) + '_' + getUniqueID(2)
+                while (project.usedIdentifiersCache.has(id))
+                project.usedIdentifiersCache.add(id)
+                this.moduleMonolithicName = id
+            } else {
+                let id
+
+                // Check if unqualified name is taken
+                const unqualified = toSnakeCase(basename(path, ".lua"))
+                if (project.usedIdentifiersCache.has(unqualified)) {
+                    // Check if qualified name is taken
+                    let modulePath = relative(resolve(project.getCompilerOptions().rootDir), path)
+                    if (modulePath.endsWith(".lua")) {
+                        modulePath = modulePath.substr(0, modulePath.length - ".lua".length)
+                    }
+                    const base = toSnakeCase(modulePath)
+                    id = id || base
+                    let extra = 1
+                    while (project.usedIdentifiersCache.has(id)) {
+                        id = base + '_' + extra
+                        extra++
+                    }
+                    project.usedIdentifiersCache.add(id)
+                    this.moduleMonolithicName = id
+                } else {
+                    // Set to unqualified name
+                    project.usedIdentifiersCache.add(unqualified)
+                    this.moduleMonolithicName = unqualified
+                }
+
             }
             this.referencingSourceFiles = new Map()
             this.exportedIdentifiersCache = new Map()
@@ -155,14 +183,32 @@ namespace Combiner {
         /** Returns the monolithic name for an identifier exported by this source file */
         getMonolithicName(identifier: string): string
         getMonolithicName(identifier?: string): string {
-            const cached = identifier && this.exportedIdentifiersCache.get(identifier)
+            if (!identifier) {
+                return this.moduleMonolithicName
+            }
+            const cached = this.exportedIdentifiersCache.get(identifier)
             if (cached) {
                 return cached
             }
             if (this.obfuscated) {
-                return "_" + getUniqueID(10)
+                let id: string
+                do {
+                    id = "_" + getUniqueID(10)
+                }
+                while (this.project.usedIdentifiersCache.has(id))
+                this.project.usedIdentifiersCache.add(id)
+
+                return id
             } else {
-                return this.moduleMonolithicName + (identifier ? ("_" + identifier) : "")
+                const base = this.moduleMonolithicName + (identifier ? ("_" + identifier) : "")
+                let id = base
+                let extra = 1
+                while (this.project.usedIdentifiersCache.has(id)) {
+                    id = base + '_' + extra
+                    extra++
+                }
+                this.project.usedIdentifiersCache.add(id)
+                return id
             }
         }
 		getBaseName(): string {
@@ -246,6 +292,7 @@ namespace Combiner {
         private includedSourceFiles: Set<SourceFile>
         private includedSourcePaths: Set<string>
         private entryPoints: SourceFile[]
+        public usedIdentifiersCache: Set<string> = new Set()
         constructor(options: ProjectConfig) {
             // Override defaults with config file
             const config = Project.getDefaultOptions()

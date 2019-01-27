@@ -59,7 +59,7 @@ namespace JsCallGlobals {
                             from: expression.name,
                             to: sourceFile.getMonolithicName(expression.name),
                             range: expression.range,
-                            inparens: expression.inparens,
+                            inParens: expression.inParens,
                         })
                     } else {
                         throw new TranspilerError(

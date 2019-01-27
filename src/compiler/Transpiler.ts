@@ -13,6 +13,7 @@ import JsCallGlobals = require("./transpiler/JsCallGlobals");
 import * as ExtendedLua from "./transpiler/ExtendedLua";
 
 const DEBUG_INPUT = false
+const DEBUG_REPLACEMENTS = false
 
 function _getNestedIdentifiers(root: {[index: string]: any}, stack: ExtendedLua.Node[], addTo: [ParsedLua.Identifier, ExtendedLua.Node[]][]): [ParsedLua.Identifier, ExtendedLua.Node[]][] {
 	// Add root to stack if it is a node object
@@ -81,13 +82,12 @@ export default class Transpiler {
 
 		// Collect and transpile source modules
 		const transpiledHash = new Set<SourceFile>()
-		const transpiledStack: SourceFile[] = []
+		let transpiledStack: SourceFile[] = []
 		this.transpileSourceFile(entryPointSource, transpiledHash, transpiledStack)
 
 		// Put the files together
 		let header = ""
 		let body = ""
-		transpiledStack.reverse()
 		transpiledStack.forEach(module => {
 			// Add exported identifiers to header
 			header = header + "local " + module.getMonolithicName() + (ugly ? ';' : '\n')
@@ -104,6 +104,7 @@ export default class Transpiler {
 		const compilerOptions = this.compiler.getProject().getCompilerOptions()
 		const ugly = compilerOptions.uglify
 
+		const isEntryPoint = transpiledHash.size === 0
 		// Ignore if already transpiled
 		if (transpiledHash.has(sourceFile)) {
 			return;
@@ -163,8 +164,15 @@ export default class Transpiler {
 							}
 							if (ParsedLua.expect("Identifier")(identifier)) {
 								if (!identifier.isLocal && identifier.name === identifierToReplace.from) {
-									console.log("Replacing imported identifier at '" + sourceFile.getBaseName() + `"' line ${posToLineCol(sourceFile, identifier.range[0])[0]}': '${identifierToReplace.from}' => ${identifierToReplace.to}"`)
+									if (DEBUG_REPLACEMENTS) {
+										console.log("Replacing imported identifier at '"
+											+ sourceFile.getBaseName()
+											+ `"' line ${posToLineCol(sourceFile, identifier.range[0])[0]}': '${identifierToReplace.from}' => ${identifierToReplace.to}"`
+										)
+									}
+									const wasInParens = identifier.inParens
 									morphObject(identifier, identifierToReplace)
+									identifier.inParens = wasInParens
 								}
 							}
 						})
@@ -188,15 +196,28 @@ export default class Transpiler {
 						}
 
 						if (!identifier.isLocal && identifier.name === identifierToReplace.from) {
-							console.log("Replacing exported identifier at '" + sourceFile.getBaseName() + `"' line ${posToLineCol(sourceFile, identifier.range[0])[0]}': '${identifierToReplace.from}' => ${identifierToReplace.to}"`)
+							if (DEBUG_REPLACEMENTS) {
+								console.log("Replacing exported identifier at '"
+									+ sourceFile.getBaseName()
+									+ `"' line ${posToLineCol(sourceFile, identifier.range[0])[0]}': '${identifierToReplace.from}' => ${identifierToReplace.to}"`
+								)
+							}
 							identifier.name = identifierToReplace.to
 						}
 					})
 				})
 			})
 
-			// Transpile as code block
-			const transpiled = "do" + (ugly ? ' ' : '\n') + astToLua(ast, 1, ugly) + (ugly ? ' ' : '\n') + "end"
+			let transpiled: string
+
+			// Transpile chunk
+			if (isEntryPoint) {
+				// Do not indent entry point
+				transpiled = astToLua(ast, 0, ugly)
+			} else {
+				// Wrap imported modules in a 'do' block
+				transpiled = "do" + (ugly ? ' ' : '\n') + astToLua(ast, 1, ugly) + (ugly ? ' ' : '\n') + "end"
+			}
 
 			// Cache transpile and add to stack
 			sourceFile.setMonolithCache(transpiled, ast)
@@ -216,7 +237,11 @@ export default class Transpiler {
 						remaining = match[3]
 					}
 				}
-				throw new TranspilerError(remaining || e.message, new Combiner.ErrorNode(sourceFile, parseInt(line || "1"), parseInt(col || "1")), TranspilerErrorType.SyntaxError)
+				throw new TranspilerError(
+					remaining || e.message,
+					new Combiner.ErrorNode(sourceFile, parseInt(line || "1"), parseInt(col || "1")),
+					TranspilerErrorType.SyntaxError
+				)
 			} else {
 				throw e
 			}
