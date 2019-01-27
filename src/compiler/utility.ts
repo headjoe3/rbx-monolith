@@ -80,7 +80,7 @@ export function getScriptContext(file: Combiner.SourceFile, seen = new Set<strin
 		let isServer = false;
 		let isClient = false;
 
-		for (const referencingFile of file.getReferencingSourceFiles()) {
+		for (const [referencingFile] of file.getReferencingSourceFiles()) {
 			const referenceContext = getScriptContext(referencingFile, seen);
 			if (referenceContext === ScriptContext.Server) {
 				isServer = true;
@@ -114,4 +114,47 @@ export function yellow(text: string) {
 
 export function suggest(text: string) {
 	return `...\t${yellow(text)}`;
+}
+
+
+export function upperCamelCaseToPhrase(value: any): string {
+	if (typeof value !== "string") return typeof value;
+
+    // see what i did there
+    let UpperCamelCase = ""
+    let nextHasSpace = false
+
+    for (let i = 0; i < value.length; i++) {
+        const char = value.charAt(i)
+        if (
+            (char >= 'a' && char <= 'z')
+        ) {
+            UpperCamelCase += char
+        } else {
+            if (char >= 'A' && char <= 'Z') { 
+				if (nextHasSpace) {
+					UpperCamelCase += " "
+					nextHasSpace = false
+				}
+				UpperCamelCase += char.toLowerCase()
+			}
+            nextHasSpace = true
+        }
+    }
+    return UpperCamelCase
+}
+
+export function posToLineCol(sourceFile: Combiner.SourceFile, pos: number): [number, number] {
+    let lines = 1
+    let chars = 1
+    const source = sourceFile.readSync()
+    for (let i = 0; i < pos; i++) {
+        const char = source[i]
+        if (char.match(/\n/) !== null) {
+            lines++
+            chars = 0
+        }
+        chars++
+    }
+    return [lines, chars]
 }

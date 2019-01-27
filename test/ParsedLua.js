@@ -69,7 +69,8 @@ end`,
 `for _,v in pairs(x) do end
 while true do end
 for i = 1, 2, 3 do end
-for _,v in next, {} do end`,
+for i = 1, 2 do end
+for _,v in next, {} do break; return end`,
 ]
 const invalid_examples = [
 `123 $!@#$%^`,
@@ -78,6 +79,8 @@ const invalid_examples = [
 `export default x`,
 `export default function x() end`,
 `export default class x do end`,
+`for x[1], x[2] in pairs(x) do end`,
+`for i = 1 do end`,
 ]
 
 function getNodesOfType(type, root) {
@@ -825,6 +828,84 @@ describe('ParsedLua', function() {
         it('should have value property of type string', function() {
             forEachValidExampleNode(NODE_TYPE, node => {
                 assert.isString(node.value)
+            })
+        })
+    })
+    describe('ForGenericStatement', function() {
+        const NODE_TYPE = 'ForGenericStatement'
+        it('should be found in at least one example', function() {
+            let wasFound = false
+            forEachValidExampleNode(NODE_TYPE, (node) => {
+                wasFound = true
+            })
+            assert.isOk(wasFound)
+        })
+        it('should have variables of type Identifier[]', function() {
+            forEachValidExampleNode(NODE_TYPE, (node) => {
+                node.variables.forEach(variablesNode => {
+                    assertNodeType("Identifier", variablesNode)
+                })
+            })
+        })
+        it('should have iterators property of type "Expression[]"', function() {
+            forEachValidExampleNode(NODE_TYPE, (node) => {
+                node.iterators.forEach(iteratorNode => {
+                    assertNodeType("Expression", iteratorNode)
+                })
+            })
+        })
+    })
+    describe('ForNumericStatement', function() {
+        const NODE_TYPE = 'ForNumericStatement'
+        it('should be found in at least one example', function() {
+            let wasFound = false
+            forEachValidExampleNode(NODE_TYPE, (node) => {
+                wasFound = true
+            })
+            assert.isOk(wasFound)
+        })
+        it('should have variable of type Identifier', function() {
+            forEachValidExampleNode(NODE_TYPE, (node) => {
+                assertNodeType("Identifier", node.variable)
+            })
+        })
+        it('should have start of type Expression', function() {
+            forEachValidExampleNode(NODE_TYPE, (node) => {
+                assertNodeType("Expression", node.start)
+            })
+        })
+        it('should have end of type Expression', function() {
+            forEachValidExampleNode(NODE_TYPE, (node) => {
+                assertNodeType("Expression", node.end)
+            })
+        })
+        it('should have optional parameter step', function() {
+            assertNodeHasOptionalField(NODE_TYPE, "step")
+        })
+        it('should have step of type Expression | null', function() {
+            forEachValidExampleNode(NODE_TYPE, (node) => {
+                assert.isTrue(
+                    ParsedLua.expect("Expression")(node.step)
+                    || node.step === null,
+                    "Got step type " + (node.step !== null && node.step.type)
+                )
+            })
+        })
+    })
+    describe('HasBody', function() {
+        const NODE_TYPE = 'HasBody'
+        it('should be found in at least one example', function() {
+            let wasFound = false
+            forEachValidExampleNode(NODE_TYPE, (node) => {
+                wasFound = true
+            })
+            assert.isOk(wasFound)
+        })
+        it('should have body of type Statement[]', function() {
+            forEachValidExampleNode(NODE_TYPE, (node) => {
+                node.body.forEach(bodyNode => {
+                    assertNodeType("Statement", bodyNode)
+                })
             })
         })
     })

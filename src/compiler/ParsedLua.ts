@@ -26,35 +26,36 @@ interface ParseOptions {
     extendedIdentifiers?: boolean
 }
 
-interface NodeBase {
-    /** The type of node */
-    type: string
-}
-interface ExpressionBase extends NodeBase {
-    /** True for expressions that are placed inside of parentheses */
-    inparens?: boolean
-}
 
+///** A temporary marker that generalizes nodes whose strict type has not yet been proven in unit testing */
+//type ShouldBe<T, CouldBe = NodeBase> = T extends NodeBase ? T | CouldBe : any
 
-/** A temporary marker that generalizes nodes whose strict type has not yet been proven in unit testing */
-type ShouldBe<T, CouldBe = NodeBase> = T extends NodeBase ? T | CouldBe : any
-
-type StatementBase = NodeBase
 /** A type checker for some node type */
-type NodeCheck<T extends NodeBase> = (value: unknown) => value is T
+type NodeCheck<T extends ParsedLua.NodeBase> = (value: unknown) => value is T
 
 export = ParsedLua
 namespace ParsedLua {
+    export interface NodeBase {
+        /** The type of node */
+        type: string
+        /** Start and end positions within the parsed string (if ParseOptions.ranges is enabled) */
+        range: [number, number]
+    }
+    export interface ExpressionBase extends NodeBase {
+        /** True for expressions that are placed inside of parentheses */
+        inParens: boolean | null
+    }
+    export type StatementBase = NodeBase
 
 
     /** Parsed Lua Expression types */
     export type Expression = Identifier | FunctionDeclarationExpression | MemberExpression | TableConstructorExpression | TableKeyString | TableKey
-        | TableValue | IndexExpression | StringLiteral | NumericLiteral | BooleanLiteral | Clause | LogicalExpression | BinaryExpression | UnaryExpression
-        | Call | NilLiteral
+        | TableValue | IndexExpression | StringLiteral | NumericLiteral | BooleanLiteral | LogicalExpression | BinaryExpression | UnaryExpression
+        | Call | NilLiteral | VarargLiteral
     export const ExpressionStringTypes = [
         "Identifier", "FunctionDeclarationExpression", "MemberExpression", "TableConstructorExpression", "TableKeyString", "TableKey",
-        "TableValue", "IndexExpression", "StringLiteral", "NumericLiteral", "BooleanLiteral", "Clause", "LogicalExpression",
-        "BinaryExpression", "UnaryExpression", "Call", "NilLiteral"
+        "TableValue", "IndexExpression", "StringLiteral", "NumericLiteral", "BooleanLiteral", "LogicalExpression",
+        "BinaryExpression", "UnaryExpression", "Call", "NilLiteral", "VarargLiteral"
     ]
 
 
@@ -62,6 +63,8 @@ namespace ParsedLua {
     export interface Identifier extends ExpressionBase {
         type: "Identifier"
         name: string
+        /** True iff the identifier refers to a localized variable (if ParseOptions.ranges is enabled) */
+        isLocal: boolean
     }
     /** A union between function declaration statements and function declaration expressions. */
     export interface FunctionDeclaration extends ExpressionBase {
@@ -93,7 +96,7 @@ namespace ParsedLua {
     export interface TableConstructorExpression extends ExpressionBase {
         type: "TableConstructorExpression"
         /** A set of expressions that construct the table's contents */
-        fields?: (TableKeyString | TableValue | TableKey)[]
+        fields: (TableKeyString | TableValue | TableKey)[]
     }
     /** A table constructor expression that sets a key (of any type) in a table using square brackets */
     export interface TableKey extends ExpressionBase {
@@ -126,6 +129,11 @@ namespace ParsedLua {
         /** The contents of the string */
         value: string
         /** The raw literal (in quotes) that was parsed */
+        raw: string
+    }
+    export interface VarargLiteral extends ExpressionBase {
+        type: "VarargLiteral"
+        value: '...'
         raw: string
     }
     /** An expression that evaluates to a literal number */
@@ -208,10 +216,10 @@ namespace ParsedLua {
 
     /** Parsed Lua Statement types */
     export type Statement = LocalStatement | CallStatement | AssignmentStatement | ReturnStatement | FunctionDeclarationStatement | DoStatement | IfStatement
-        | ForGenericStatement | ForNumericStatement | WhileStatement | RepeatStatement
+        | ForGenericStatement | ForNumericStatement | WhileStatement | RepeatStatement | BreakStatement
     export const StatementStringTypes = [
         "LocalStatement", "CallStatement", "AssignmentStatement", "ReturnStatement", "FunctionDeclarationStatement", "DoStatement", "IfStatement",
-        "ForGenericStatement", "ForNumericStatement", "WhileStatement", "RepeatStatement"
+        "ForGenericStatement", "ForNumericStatement", "WhileStatement", "RepeatStatement", "BreakStatement"
     ]
 
 
@@ -253,23 +261,23 @@ namespace ParsedLua {
     /** A conditional statement to execute a clause body if one clause condition is met */
     export interface IfStatement extends StatementBase {
         type: "IfStatement"
-        clauses: Clause
+        clauses: Clause[]
     }
     export interface ForGenericStatement extends StatementBase {
         type: "ForGenericStatement"
-        variables: ShouldBe<Identifier>[]
-        iterators: ShouldBe<CallExpression>[]
+        variables: Identifier[]
+        iterators: Expression[]
         body: Statement[]
     }
     export interface ForNumericStatement extends StatementBase {
         type: "ForNumericStatement"
-        variable: ShouldBe<Identifier>
+        variable: Identifier
         /** An expression that evaluates to the number at which the for loop should start */
-        start: ShouldBe<Expression>
+        start: Expression
         /** An expression that evaluates to the number at which the for loop should end */
-        end: ShouldBe<Expression>
+        end: Expression
         /** An expression that evaluates to the number for which the loop should increment after each step*/
-        step: ShouldBe<Expression>
+        step: Expression | null
         body: Statement[]
     }
     export interface WhileStatement extends StatementBase {
@@ -281,6 +289,9 @@ namespace ParsedLua {
         type: "RepeatStatement"
         condition: Expression
         body: Statement[]
+    }
+    export interface BreakStatement extends StatementBase {
+        type: "BreakStatement"
     }
 
 
@@ -317,6 +328,8 @@ namespace ParsedLua {
         body: Statement[]
         /** A collection of all comments that were placed in the parsed lua chunk, without position information. */
         comments: Comment[]
+        /** A list of global identifiers encountered in this chunk (if the 'scope' option is enabled) */
+        globals: Identifier[]
     }
     /** Comments are not attached to any node when parsed, so they are all grouped together in the chunk return statement' comments */
     export interface Comment extends NodeBase {
@@ -368,6 +381,7 @@ namespace ParsedLua {
     export function expect(nodeType: "BinaryExpression"): NodeCheck<BinaryExpression>
     
     export function expect(nodeType: "StringLiteral"): NodeCheck<StringLiteral>
+    export function expect(nodeType: "VarargLiteral"): NodeCheck<VarargLiteral>
     export function expect(nodeType: "NumericLiteral"): NodeCheck<NumericLiteral>
     export function expect(nodeType: "BooleanLiteral"): NodeCheck<BooleanLiteral>
     export function expect(nodeType: "NilLiteral"): NodeCheck<NilLiteral>
@@ -384,6 +398,7 @@ namespace ParsedLua {
     export function expect(nodeType: "ForNumericStatement"): NodeCheck<ForNumericStatement>
     export function expect(nodeType: "WhileStatement"): NodeCheck<WhileStatement>
     export function expect(nodeType: "RepeatStatement"): NodeCheck<RepeatStatement>
+    export function expect(nodeType: "BreakStatement"): NodeCheck<BreakStatement>
 
     // Clause types
     export function expect(nodeType: "IfClause"): NodeCheck<IfClause>

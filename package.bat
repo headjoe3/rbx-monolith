@@ -1,0 +1,1 @@
+pkg . -o bin/rbx-monolith.exe --target node10-win-x64

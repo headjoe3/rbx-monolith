@@ -4,3 +4,7 @@ test
 reference
 lua_src
 lua_out
+bin
+package.bat
+package.json
+bin

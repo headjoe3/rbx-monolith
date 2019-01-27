@@ -7,7 +7,7 @@ import * as yargs from "yargs";
 import { Compiler } from "./compiler/Compiler";
 import { CompilerError } from "./compiler/errors/CompilerError";
 import { TranspilerError } from "./compiler/errors/TranspilerError";
-import { clearContextCache } from "./compiler/utility";
+import { clearContextCache, red } from "./compiler/utility";
 //import * as util from "util";
 
 //@ts-ignore
@@ -69,7 +69,8 @@ if (fs.statSync(configFilePath).isDirectory()) {
 }
 
 if (!fs.existsSync(configFilePath) || !fs.statSync(configFilePath).isFile()) {
-    throw new Error("Cannot find monolithconfig.json!");
+    console.log(red("Compiler Error"), "Cannot find monolithconfig.json!");
+    process.exit(2)
 }
 
 const noInclude = argv.noInclude === true;

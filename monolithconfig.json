@@ -1,10 +1,16 @@
 {
-	"compilerOptions": {
-		"outDir": "lua_out",
-		"rootDir": "lua_src",
-		"baseUrl": "lua_src"
-	},
+	"outDir": "lua_out",
+	"rootDir": "lua_src",
+	"entryPoints": [
+		"client.lua",
+		"server.lua"
+	],
 	"include": [
 		"lua_src"
-	]
+	],
+	"exclude": [
+		"lua_src"
+	],
+	"obfuscate": true,
+	"uglify": true
 }

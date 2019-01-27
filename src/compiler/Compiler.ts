@@ -12,22 +12,10 @@ import {
 	yellow,
 } from "./utility";
 import { CompilerError, CompilerErrorType } from "./errors/CompilerError";
-import { DiagnosticError } from "./errors/DiagnosticError";
 import * as Combiner from "./Combiner";
 import { Project } from "./Combiner";
 import Transpiler from "./Transpiler";
 import { TranspilerError } from "./errors/TranspilerError";
-
-const SYNC_FILE_NAMES = ["rojo.json", "rofresh.json"];
-
-interface RojoJson {
-	partitions: {
-		[index: string]: {
-			target: string;
-			path: string;
-		};
-	};
-}
 
 interface Partition {
 	dir: Combiner.Directory;
@@ -108,7 +96,6 @@ export async function copyAndCleanDeadLuaFiles(sourceFolder: string, destination
 export class Compiler {
 	private readonly project: Project;
 	private readonly projectPath: string;
-	private readonly baseUrl: string | undefined;
 	private readonly rootDirPath: string;
 	private readonly outDirPath: string;
 	private readonly compilerOptions: Combiner.CompilerOptions;
@@ -119,7 +106,6 @@ export class Compiler {
 	public readonly ci: boolean;
 
 	constructor(configFilePath: string, args: { [argName: string]: any }) {
-
 		this.projectPath = path.resolve(configFilePath, "..");
 		this.project = new Project({
 			monolithConfigFilePath: configFilePath,
@@ -131,6 +117,7 @@ export class Compiler {
 		this.compilerOptions = this.project.getCompilerOptions();
 		try {
 			this.validateCompilerOptions();
+			this.project.loadSourceFiles()
 		} catch (e) {
 			if (e instanceof CompilerError) {
 				console.log(red("Compiler Error:"), e.message);
@@ -139,8 +126,6 @@ export class Compiler {
 				throw e;
 			}
 		}
-
-		this.baseUrl = this.compilerOptions.baseUrl;
 
 		const rootDirPath = this.compilerOptions.rootDir;
 		if (!rootDirPath) {
@@ -163,46 +148,9 @@ export class Compiler {
 				}
 			});
 		}
-
-		const syncFilePath = this.getSyncFilePath();
-		if (syncFilePath) {
-			const rojoJson = JSON.parse(fs.readFileSync(syncFilePath).toString()) as RojoJson;
-			for (const key in rojoJson.partitions) {
-				const part = rojoJson.partitions[key];
-				const partPath = path.resolve(this.projectPath, part.path).replace(/\\/g, "/");
-				if (partPath.startsWith(this.outDirPath)) {
-					const directory = this.project.getDirectory(
-						path.resolve(this.rootDirPath, path.relative(this.outDirPath, partPath)),
-					);
-					if (directory) {
-						this.syncInfo.push({
-							dir: directory,
-							target: part.target,
-						});
-					} else {
-						throw new CompilerError(
-							`Could not find directory for partition: ${JSON.stringify(part)}`,
-							CompilerErrorType.MissingPartitionDir,
-						);
-					}
-				} else if (this.baseUrl && partPath.startsWith(this.baseUrl)) {
-					const directory = this.project.getDirectory(
-						path.resolve(this.baseUrl, path.relative(this.baseUrl, partPath)),
-					);
-					if (directory) {
-						this.syncInfo.push({
-							dir: directory,
-							target: part.target,
-						});
-					} else {
-						throw new CompilerError(
-							`Could not find directory for partition: ${JSON.stringify(part)}`,
-							CompilerErrorType.MissingPartitionDir,
-						);
-					}
-				}
-			}
-		}
+	}
+	public getProject(): Combiner.Project {
+		return this.project
 	}
 
 	private validateCompilerOptions() {
@@ -230,16 +178,7 @@ export class Compiler {
 		}
 	}
 
-	private getSyncFilePath() {
-		for (const name of SYNC_FILE_NAMES) {
-			const filePath = path.resolve(this.projectPath, name);
-			if (fs.existsSync(filePath)) {
-				return filePath;
-			}
-		}
-	}
-
-	private transformPathToLua(filePath: string) {
+	private transformPathToOut(filePath: string) {
 		const relativeToRoot = path.dirname(path.relative(this.rootDirPath, filePath));
 		let name = path.basename(filePath, path.extname(filePath));
 		const exts = new Array<string>();
@@ -259,7 +198,7 @@ export class Compiler {
 		return path.join(this.outDirPath, relativeToRoot, luaName);
 	}
 
-	private transformPathFromLua(filePath: string) {
+	private transformPathFromOut(filePath: string) {
 		const relativeToOut = path.dirname(path.relative(this.outDirPath, filePath));
 		let name = path.basename(filePath, path.extname(filePath));
 		if (name === "init") {
@@ -296,11 +235,9 @@ export class Compiler {
 				} else {
 					const ext = path.extname(filePath);
 					if (ext === ".lua") {
-						const rootPath = this.transformPathFromLua(filePath);
+						const rootPath = this.transformPathFromOut(filePath);
 						if (
-							!(await fs.pathExists(rootPath + ".ts")) &&
-							!(await fs.pathExists(rootPath + ".lua")) &&
-							!(await fs.pathExists(rootPath + ".tsx"))
+							!(await fs.pathExists(rootPath + ".lua"))
 						) {
 							fs.removeSync(filePath);
 						}
@@ -318,15 +255,12 @@ export class Compiler {
 	}
 
 	public async compileAll(noInclude: boolean) {
-		// Debug
-		// new Transpiler(this).transpileSourceFile(new Combiner.SourceFile(this.project.getDirectory("/lua_src/test.lua")!.path))
-		
-		await this.compileFiles(this.project.getSourceFiles());
+		await this.compileFiles(this.project.getEntryPoints());
 	}
 
 	public async compileFileByPath(filePath: string) {
 		const ext = path.extname(filePath);
-		if (ext === ".lua" || ext === ".monolith") {
+		if (ext === ".lua") {
 			const sourceFile = this.project.getSourceFile(filePath);
 			if (!sourceFile) {
 				throw new CompilerError(
@@ -340,7 +274,7 @@ export class Compiler {
 
 			const search = (file: Combiner.SourceFile) => {
 				files.push(file);
-				file.getReferencingSourceFiles().forEach(ref => {
+				file.getReferencingSourceFiles().forEach((identifiers, ref) => {
 					const refPath = ref.getFilePath();
 					if (!seen.has(refPath)) {
 						seen.add(refPath);
@@ -356,57 +290,13 @@ export class Compiler {
 
 	public async compileFiles(files: Array<Combiner.SourceFile>) {
 		await this.cleanDirRecursive(this.outDirPath);
-
-		const errors = new Array<string>();
-		if (!this.noStrict) {
-			for (const file of files) {
-				const diagnostics = file
-					.getPreEmitDiagnostics()
-					.filter(diagnostic => diagnostic.getCategory() === Combiner.DiagnosticCategory.Error)
-					.filter(diagnostic => diagnostic.getCode() !== 2688);
-				for (const diagnostic of diagnostics) {
-					const diagnosticFile = diagnostic.getSourceFile();
-					const line = diagnostic.getLineNumber();
-					let prefix = "";
-					if (diagnosticFile) {
-						prefix += path.relative(this.projectPath, diagnosticFile.getFilePath());
-						if (line) {
-							prefix += ":" + line;
-						}
-						prefix += " - ";
-					}
-
-					let messageText = diagnostic.getMessageText();
-					if (messageText instanceof Combiner.DiagnosticMessageChain) {
-						const textSegments = new Array<string>();
-						let chain: Combiner.DiagnosticMessageChain | undefined = messageText;
-						while (chain !== undefined) {
-							textSegments.push(chain.getMessageText());
-							chain = chain.getNext();
-						}
-						messageText = textSegments.join("\n");
-					}
-					const str = prefix + red("Diagnostic Error: ") + messageText;
-					if (!this.ci) {
-						console.log(str);
-					}
-					errors.push(str);
-				}
-			}
-		}
-
 		try {
-			if (errors.length > 0) {
-				process.exitCode = 1;
-				throw new DiagnosticError(errors);
-			}
-
 			const sources = files
 				.map(sourceFile => {
 					const transpiler = new Transpiler(this);
 					return [
-						this.transformPathToLua(sourceFile.getFilePath()),
-						transpiler.transpileSourceFile(sourceFile),
+						this.transformPathToOut(sourceFile.getFilePath()),
+						transpiler.transpileEntryPoint(sourceFile),
 					];
 				});
 
@@ -430,14 +320,12 @@ export class Compiler {
 					"%s:%d:%d - %s %s",
 					path.relative(this.projectPath, e.node.getSourceFile().getFilePath()),
 					e.node.getStartLineNumber(),
-					e.node.getNonWhitespaceStart() - e.node.getStartLinePos(),
+					e.node.getStartColumnNumber(),
 					red("Transpiler Error:"),
 					e.message,
 				);
 			} else if (e instanceof CompilerError) {
 				console.log(red("Compiler Error:"), e.message);
-			} else if (e instanceof DiagnosticError) {
-				// log above
 			} else {
 				throw e;
 			}
