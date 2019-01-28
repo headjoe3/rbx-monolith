@@ -177,7 +177,7 @@ namespace ParsedLua {
     /** An operator expression on a single expression argument */
     export interface UnaryExpression extends ExpressionBase {
         type: "UnaryExpression",
-        operator: '-' | '#',
+        operator: '-' | '#' | 'not',
         argument: Expression,
     }
 

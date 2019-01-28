@@ -5,7 +5,9 @@ export enum TranspilerErrorType {
 	ImportSyntaxError,
 	ImportError,
 	ExportSyntaxError,
-	ExportError
+	ExportError,
+	NamespaceSyntaxError,
+	NamespaceError
 }
 
 export class TranspilerError extends Error {

@@ -220,6 +220,9 @@ namespace Combiner {
         getFilePath(): string {
             return this.path
         }
+		addReference(sourceFile: SourceFile, identifiers: string[]): any {
+			this.referencingSourceFiles.set(sourceFile, identifiers)
+		}
         getReferencingSourceFiles(): Map<SourceFile, string[]> {
             return this.referencingSourceFiles
         }
@@ -232,6 +235,13 @@ namespace Combiner {
         }
         setMonolithicExports(exportToMonolithic: Map<string, string>) {
             this.exportedIdentifiersCache = exportToMonolithic
+        }
+        getMonolithicExport(identifier?: string) {
+            if (identifier) {
+                return this.exportedIdentifiersCache.get(identifier)
+            } else {
+                return this.moduleMonolithicName
+            }
         }
         getTranspiledCache(): string | undefined {
             return this.transpiledChunkCache

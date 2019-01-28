@@ -8,44 +8,11 @@ const INDENTATION = "     "
 const LENGTH_BEFORE_NEWLINES = 60
 
 /*
-function escapeDoubleQuotes(str: string): string {
+function escapeChar(charToEscape: string, str: string): string {
     let output = ""
     for(let i = 0; i < str.length; i++) {
         const char = str[i]
-        if (char === '\"') {
-            output = output + "\\"
-        }
-        output = output + char
-    }
-    return output
-}
-function escapeSingleQuotes(str: string): string {
-    let output = ""
-    for(let i = 0; i < str.length; i++) {
-        const char = str[i]
-        if (char === '\'') {
-            output = output + "\\"
-        }
-        output = output + char
-    }
-    return output
-}
-function escapeCloseBrackets(str: string): string {
-    let output = ""
-    for(let i = 0; i < str.length; i++) {
-        const char = str[i]
-        if (char === '\]') {
-            output = output + "\\"
-        }
-        output = output + char
-    }
-    return output
-}
-function escapeBackslash(str: string): string {
-    let output = ""
-    for(let i = 0; i < str.length; i++) {
-        const char = str[i]
-        if (char === '\\') {
+        if (char === charToEscape) {
             output = output + "\\"
         }
         output = output + char
@@ -53,6 +20,7 @@ function escapeBackslash(str: string): string {
     return output
 }
 */
+
 function wrapInParensIf(str: string, isInParens: boolean | null): string {
     return (isInParens === true)
         ? ('(' + str + ')')
@@ -178,7 +146,7 @@ function formatExpression(ast: ExtendedLua.Expression, indentation: number, ugly
             expression = formatExpression(ast.value, indentation, ugly)
             break
         case "UnaryExpression":
-            expression = ast.operator + formatExpression(ast.argument, indentation, ugly)
+            expression = ast.operator + (ast.operator === "not" ? " " : "") + formatExpression(ast.argument, indentation, ugly)
             break
         default:
             throw new Error(`Expression type '${(ast as ExtendedLua.Expression).type}' not implemented!`)
@@ -198,6 +166,17 @@ function formatStatement(ast: ExtendedLua.Statement, indentation: number, ugly: 
     let parsedFormalParameters: string
     let parsedCondition: string
     switch(ast.type) {
+        case "NamespaceStatement":
+        case "ExportStatement":
+            return formatStatementsInBody(ast.assignments, indentation, ugly)
+        case "ImportStatement":
+            statement = ""
+            break
+        case "ExtendedAssignmentStatement":
+            parsedVariables = ast.variables.map(variableExpression => formatExpression(variableExpression, indentation, ugly)).join(ugly ? ',' : ', ')
+            parsedValues = ast.init.map(valueExpression => formatExpression(valueExpression, indentation, ugly)).join(ugly ? ',' : ', ')
+            statement = parsedVariables + (ugly ? '=' : ' = ') + parsedValues
+            break
         case "AssignmentStatement":
             parsedVariables = ast.variables.map(variableExpression => formatExpression(variableExpression, indentation, ugly)).join(ugly ? ',' : ', ')
             parsedValues = ast.init.map(valueExpression => formatExpression(valueExpression, indentation, ugly)).join(ugly ? ',' : ', ')
@@ -254,8 +233,6 @@ function formatStatement(ast: ExtendedLua.Statement, indentation: number, ugly: 
                 }
             }).join("\n" + prefix) + (ugly ? ' ' : ("\n" + prefix)) +"end"
             break
-        case "ImportStatement":
-            return ""
         case "LocalStatement":
             parsedVariables = ast.variables.map(variableExpression => formatExpression(variableExpression, indentation, ugly)).join(ugly ? ',' : ', ')
             parsedValues = ast.init.map(valueExpression => formatExpression(valueExpression, indentation, ugly)).join(ugly ? ',' : ', ')
@@ -293,7 +270,7 @@ function formatStatementsInBody(ast: ExtendedLua.Statement[], indentation: numbe
         // Filter out statements that have no actions
         .filter(statement => (
             (statement.type !== "ImportStatement")
-            && (statement.type !== "ExportStatement")
+            && ((statement.type !== "ExportStatement") || statement.assignments.length !== 0)
         ))
         .map(statement => formatStatement(statement, indentation, ugly)).join(ugly ? ';' : '\n')
 }
